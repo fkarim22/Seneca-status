@@ -366,26 +366,16 @@ const SERVICES = [
 ];
 
 // ══════════════════════════════════════════════════════════════════════════════
-// HYBRID STATUS SYSTEM
-// Group A — Direct vendor APIs with North America filtering
-//   → Cloudflare, GitHub, AWS, Microsoft 365, Teams, Azure, Anthropic
-// Group B — UptimeRobot (global check, fine for NA-only or no public API)
-//   → Blackboard, Duo, Palo Alto, Zoom, Google Gemini, Rogers, Bell
+// LIVE STATUS SYSTEM
+// ── UptimeRobot API (works from GitHub Pages — no CORS issues)
+//    Monitors ALL 13 services. UptimeRobot pings each vendor every 5 min
+//    and stores up/down result server-side — we just fetch the result.
+// ── Vendor APIs with native CORS support (Cloudflare, GitHub, Anthropic)
+//    These allow direct browser requests — no proxy needed.
+//    Used for North America–specific filtering on top of UptimeRobot.
 // ══════════════════════════════════════════════════════════════════════════════
 
-// NA keywords used to filter Microsoft RSS incident text
-const NA_KEYWORDS = [
-  'north america','canada','united states',' us ','usa',
-  'toronto','ontario','americas','ca-central','us-east','us-west'
-];
-
-function containsNAKeyword(text) {
-  if (!text) return false;
-  const lower = text.toLowerCase();
-  return NA_KEYWORDS.some(k => lower.includes(k));
-}
-
-// Default statuses — shown as "Checking..." on first load
+// Default — show "Checking..." until first fetch completes
 let statuses = {
   blackboard: { status:'unknown', label:'Checking...' },
   duo:        { status:'unknown', label:'Checking...' },
@@ -403,178 +393,26 @@ let statuses = {
   zoom:       { status:'unknown', label:'Checking...' },
 };
 
-// ── HELPER: convert a component/indicator status string to our format ─────────
-function componentToStatus(s) {
-  if (!s) return { status:'unknown', label:'Unknown' };
-  s = s.toLowerCase();
-  if (s === 'operational' || s === 'none' || s === 'up')
-    return { status:'ok', label:'Operational' };
-  if (s.includes('degraded') || s.includes('partial') || s.includes('minor'))
-    return { status:'warn', label:'Degraded' };
-  if (s.includes('major') || s.includes('outage') || s.includes('down') || s.includes('critical'))
-    return { status:'down', label:'Outage' };
-  return { status:'warn', label:'Degraded' };
-}
-
-// ── CORS PROXY (needed for vendor JSON APIs from a static page) ───────────────
-// Uses allorigins.win — free, no key needed, reliable
-function proxied(url) {
-  return `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-}
-
-// ── GROUP A: CLOUDFLARE (NA component filter) ─────────────────────────────────
-async function fetchCloudflare() {
-  try {
-    const r = await fetch(proxied('https://www.cloudflarestatus.com/api/v2/summary.json'));
-    const raw = await r.json();
-    const data = JSON.parse(raw.contents);
-    // Find any component with "North America" in the name
-    const naComponents = (data.components || []).filter(c =>
-      c.name && c.name.toLowerCase().includes('north america')
-    );
-    if (naComponents.length === 0) {
-      // No specific NA component — fall back to overall status
-      return componentToStatus(data.status?.indicator);
-    }
-    // If any NA component is degraded/down, surface the worst
-    const worst = naComponents.reduce((acc, c) => {
-      const s = componentToStatus(c.status);
-      if (s.status === 'down') return s;
-      if (s.status === 'warn' && acc.status !== 'down') return s;
-      return acc;
-    }, { status:'ok', label:'Operational' });
-    return worst;
-  } catch(e) {
-    return { status:'unknown', label:'Unavailable' };
-  }
-}
-
-// ── GROUP A: GITHUB (NA component filter) ────────────────────────────────────
-async function fetchGitHub() {
-  try {
-    const r = await fetch(proxied('https://www.githubstatus.com/api/v2/summary.json'));
-    const raw = await r.json();
-    const data = JSON.parse(raw.contents);
-    // GitHub components don't have regional names — use overall indicator
-    // but check active incidents for NA mentions
-    const activeIncidents = (data.incidents || []).filter(i =>
-      i.status !== 'resolved' && containsNAKeyword(i.name + ' ' + (i.incident_updates?.[0]?.body || ''))
-    );
-    if (activeIncidents.length > 0) {
-      const imp = activeIncidents[0].impact;
-      if (imp === 'critical' || imp === 'major') return { status:'down', label:'Outage' };
-      return { status:'warn', label:'Degraded' };
-    }
-    // No NA incidents — check overall
-    const ind = data.status?.indicator;
-    if (!ind || ind === 'none') return { status:'ok', label:'Operational' };
-    return componentToStatus(ind);
-  } catch(e) {
-    return { status:'unknown', label:'Unavailable' };
-  }
-}
-
-// ── GROUP A: ANTHROPIC / CLAUDE (NA component filter) ────────────────────────
-async function fetchAnthropic() {
-  try {
-    const r = await fetch(proxied('https://status.anthropic.com/api/v2/summary.json'));
-    const raw = await r.json();
-    const data = JSON.parse(raw.contents);
-    const activeIncidents = (data.incidents || []).filter(i =>
-      i.status !== 'resolved'
-    );
-    if (activeIncidents.length > 0) {
-      const imp = activeIncidents[0].impact;
-      if (imp === 'critical' || imp === 'major') return { status:'down', label:'Outage' };
-      return { status:'warn', label:'Degraded' };
-    }
-    const ind = data.status?.indicator;
-    if (!ind || ind === 'none') return { status:'ok', label:'Operational' };
-    return componentToStatus(ind);
-  } catch(e) {
-    return { status:'unknown', label:'Unavailable' };
-  }
-}
-
-// ── GROUP A: AWS (NA regions only) ───────────────────────────────────────────
-async function fetchAWS() {
-  try {
-    const r = await fetch(proxied('https://health.aws.amazon.com/health/status'));
-    const raw = await r.json();
-    const data = JSON.parse(raw.contents);
-    // NA regions to check
-    const naRegions = ['us-east-1','us-east-2','us-west-1','us-west-2','ca-central-1'];
-    const services = data.archive?.recentlyResolved?.concat(data.archive?.current || []) || [];
-    const naIssues = services.filter(s =>
-      naRegions.some(r => (s.region || '').includes(r)) && s.status !== 'closed'
-    );
-    if (naIssues.length > 0) return { status:'warn', label:'Degraded' };
-    return { status:'ok', label:'Operational' };
-  } catch(e) {
-    // AWS health API is complex — fall back to ok if unreachable
-    return { status:'ok', label:'Operational' };
-  }
-}
-
-// ── GROUP A: MICROSOFT 365 & TEAMS (NA keyword filter on RSS) ────────────────
-async function fetchMicrosoft365() {
-  try {
-    const r = await fetch(proxied('https://status.cloud.microsoft/api/feed/'));
-    const raw = await r.json();
-    const xml = raw.contents;
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(xml, 'text/xml');
-    const items = Array.from(doc.querySelectorAll('item'));
-    // Find active (non-resolved) incidents mentioning North America
-    const naIncidents = items.filter(item => {
-      const title = item.querySelector('title')?.textContent || '';
-      const desc  = item.querySelector('description')?.textContent || '';
-      const combined = title + ' ' + desc;
-      const isResolved = combined.toLowerCase().includes('resolved') ||
-                         combined.toLowerCase().includes('mitigated');
-      return !isResolved && containsNAKeyword(combined);
-    });
-    if (naIncidents.length > 0) return { status:'warn', label:'Degraded' };
-    return { status:'ok', label:'Operational' };
-  } catch(e) {
-    return { status:'unknown', label:'Unavailable' };
-  }
-}
-
-// ── GROUP A: AZURE (NA keyword filter on RSS) ─────────────────────────────────
-async function fetchAzure() {
-  try {
-    const r = await fetch(proxied('https://azure.status.microsoft/api/feed/'));
-    const raw = await r.json();
-    const xml = raw.contents;
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(xml, 'text/xml');
-    const items = Array.from(doc.querySelectorAll('item'));
-    const naIncidents = items.filter(item => {
-      const title = item.querySelector('title')?.textContent || '';
-      const desc  = item.querySelector('description')?.textContent || '';
-      const combined = title + ' ' + desc;
-      const isResolved = combined.toLowerCase().includes('resolved') ||
-                         combined.toLowerCase().includes('mitigated');
-      return !isResolved && containsNAKeyword(combined);
-    });
-    if (naIncidents.length > 0) return { status:'warn', label:'Degraded' };
-    return { status:'ok', label:'Operational' };
-  } catch(e) {
-    return { status:'unknown', label:'Unavailable' };
-  }
-}
-
-// ── GROUP B: UPTIMEROBOT (Blackboard, Duo, Palo Alto, Zoom, Gemini, Rogers, Bell)
+// ── UPTIMEROBOT — primary source for all services ─────────────────────────────
 const UR_API_KEY = 'u3376894-6ab76ecdfbc4abad08ad7687';
+
+// All 13 monitors mapped to service IDs
+// M365 and Teams share one monitor (same status feed from Microsoft)
 const UR_MONITOR_MAP = {
   blackboard: '802580886',
   duo:        '802580911',
+  cloudflare: '802580925',
   paloalto:   '802580928',
-  zoom:       '802580992',
+  m365:       '802580932',
+  msteams:    '802580932',
+  azure:      '802580938',
+  aws:        '802580972',
+  github:     '802580976',
+  claude:     '802580979',
   gemini:     '802580982',
   rogers:     '802580987',
   bell:       '802580988',
+  zoom:       '802580992',
 };
 
 function urCodeToStatus(code) {
@@ -588,12 +426,13 @@ function urCodeToStatus(code) {
 }
 
 async function fetchUptimeRobot() {
-  const ids = Object.values(UR_MONITOR_MAP).join('-');
+  // Get unique monitor IDs only (M365 and Teams share one)
+  const uniqueIds = [...new Set(Object.values(UR_MONITOR_MAP))].join('-');
   try {
     const r = await fetch('https://api.uptimerobot.com/v2/getMonitors', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: `api_key=${UR_API_KEY}&monitors=${ids}&format=json`
+      body: `api_key=${UR_API_KEY}&monitors=${uniqueIds}&format=json&logs=0`
     });
     const data = await r.json();
     if (data.stat === 'ok' && data.monitors) {
@@ -603,29 +442,116 @@ async function fetchUptimeRobot() {
         const m = byId[monId];
         statuses[svcId] = m ? urCodeToStatus(m.status) : { status:'unknown', label:'Unknown' };
       });
+    } else {
+      console.warn('UptimeRobot response:', data);
+      // Keep existing statuses on API error rather than wiping to unavailable
     }
   } catch(e) {
-    Object.keys(UR_MONITOR_MAP).forEach(k => {
-      statuses[k] = { status:'unknown', label:'Unavailable' };
-    });
+    console.error('UptimeRobot fetch failed:', e);
   }
 }
 
-// ── MASTER FETCH — runs all checks in parallel ────────────────────────────────
+// ── VENDOR APIS WITH NATIVE CORS — refine NA status on top of UptimeRobot ────
+// These APIs explicitly allow browser requests (Access-Control-Allow-Origin: *)
+// so no proxy is needed. We use them to get more accurate NA-specific status.
+
+const NA_KEYWORDS = [
+  'north america','canada','united states',' us ','usa',
+  'toronto','ontario','americas','ca-central','us-east','us-west'
+];
+function hasNA(text) {
+  if (!text) return false;
+  const t = text.toLowerCase();
+  return NA_KEYWORDS.some(k => t.includes(k));
+}
+function worstOf(a, b) {
+  const rank = { down:3, warn:2, ok:1, unknown:0 };
+  return rank[a.status] >= rank[b.status] ? a : b;
+}
+
+// Cloudflare — has native CORS, regional components
+async function refineCloudflare() {
+  try {
+    const r = await fetch('https://www.cloudflarestatus.com/api/v2/summary.json');
+    if (!r.ok) return;
+    const data = await r.json();
+    const naComps = (data.components||[]).filter(c =>
+      c.name && c.name.toLowerCase().includes('north america')
+    );
+    if (!naComps.length) return; // no NA component, keep UptimeRobot result
+    let worst = { status:'ok', label:'Operational' };
+    naComps.forEach(c => {
+      const s = c.status?.toLowerCase() || '';
+      let mapped;
+      if (s === 'operational') mapped = { status:'ok', label:'Operational' };
+      else if (s.includes('degraded') || s.includes('partial')) mapped = { status:'warn', label:'Degraded' };
+      else if (s.includes('major') || s.includes('outage')) mapped = { status:'down', label:'Outage' };
+      else mapped = { status:'warn', label:'Degraded' };
+      worst = worstOf(worst, mapped);
+    });
+    statuses.cloudflare = worst;
+  } catch(e) { /* keep UptimeRobot result */ }
+}
+
+// GitHub — has native CORS, check incidents for NA mentions
+async function refineGitHub() {
+  try {
+    const r = await fetch('https://www.githubstatus.com/api/v2/summary.json');
+    if (!r.ok) return;
+    const data = await r.json();
+    const active = (data.incidents||[]).filter(i => i.status !== 'resolved');
+    if (!active.length) {
+      // No active incidents globally — mark ok regardless of UptimeRobot
+      statuses.github = { status:'ok', label:'Operational' };
+      return;
+    }
+    // Active incidents — check if any mention NA
+    const naActive = active.filter(i =>
+      hasNA(i.name + ' ' + (i.incident_updates?.[0]?.body||''))
+    );
+    if (naActive.length) {
+      const imp = naActive[0].impact;
+      statuses.github = (imp==='critical'||imp==='major')
+        ? { status:'down', label:'Outage' }
+        : { status:'warn', label:'Degraded' };
+    } else {
+      // Active incidents but not NA — keep operational for our purposes
+      statuses.github = { status:'ok', label:'Operational' };
+    }
+  } catch(e) { /* keep UptimeRobot result */ }
+}
+
+// Anthropic — has native CORS
+async function refineAnthropic() {
+  try {
+    const r = await fetch('https://status.anthropic.com/api/v2/summary.json');
+    if (!r.ok) return;
+    const data = await r.json();
+    const active = (data.incidents||[]).filter(i => i.status !== 'resolved');
+    if (!active.length) {
+      statuses.claude = { status:'ok', label:'Operational' };
+      return;
+    }
+    const imp = active[0].impact;
+    statuses.claude = (imp==='critical'||imp==='major')
+      ? { status:'down', label:'Outage' }
+      : { status:'warn', label:'Degraded' };
+  } catch(e) { /* keep UptimeRobot result */ }
+}
+
+// ── MASTER FETCH — UptimeRobot first, then refine with vendor APIs ────────────
 async function fetchAllStatuses() {
-  await Promise.all([
-    // Group A — vendor APIs with NA filtering
-    fetchCloudflare().then(s  => { statuses.cloudflare = s; }),
-    fetchGitHub().then(s      => { statuses.github = s; }),
-    fetchAnthropic().then(s   => { statuses.claude = s; }),
-    fetchAWS().then(s         => { statuses.aws = s; }),
-    fetchMicrosoft365().then(s => { statuses.m365 = s; statuses.msteams = s; }),
-    fetchAzure().then(s       => { statuses.azure = s; }),
-    // Group B — UptimeRobot
-    fetchUptimeRobot(),
+  // Step 1: Get all statuses from UptimeRobot (reliable, no CORS issues)
+  await fetchUptimeRobot();
+  // Step 2: Refine NA-specific services using vendor APIs that allow CORS
+  await Promise.allSettled([
+    refineCloudflare(),
+    refineGitHub(),
+    refineAnthropic(),
   ]);
 }
 
+// ── CLOCK ─────────────────────────────────────────────────────────────────────
 function updateClock() {
   const now = new Date();
   const d = now.toLocaleDateString('en-CA',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
@@ -635,6 +561,7 @@ function updateClock() {
   document.getElementById('footerTime').textContent = 'Last rendered: ' + d + ', ' + t;
 }
 
+// ── RENDER SUMMARY ────────────────────────────────────────────────────────────
 function renderSummary() {
   const c = {ok:0,warn:0,down:0,unknown:0};
   Object.values(statuses).forEach(s => c[s.status] = (c[s.status]||0)+1);
@@ -650,6 +577,7 @@ function renderSummary() {
     <div class="summary-total">${total} services monitored</div>`;
 }
 
+// ── RENDER SERVICES ───────────────────────────────────────────────────────────
 function renderServices() {
   let delay = 0;
   document.getElementById('mainContent').innerHTML = SERVICES.map(cat => {
@@ -657,12 +585,19 @@ function renderServices() {
       const s = statuses[svc.id] || {status:'unknown',label:'Unknown'};
       const logo = LOGOS[svc.id] || `<svg viewBox="0 0 100 100"><rect width="100" height="100" rx="12" fill="#ccc"/></svg>`;
       delay += 35;
-      return `<div class="svc-row" style="animation-delay:${delay}ms">
+      const isAffected = s.status === 'down' || s.status === 'warn';
+      const rowBg = s.status==='down' ? 'background:#fff8f8;' : s.status==='warn' ? 'background:#fffdf0;' : '';
+      const naTag = isAffected
+        ? `<span style="font-size:9px;font-weight:600;margin-left:8px;padding:2px 6px;border-radius:3px;
+            background:${s.status==='down'?'#f8d7da':'#fff3cd'};
+            color:${s.status==='down'?'#842029':'#856404'};">● North America</span>`
+        : '';
+      return `<div class="svc-row" style="animation-delay:${delay}ms;${rowBg}">
         <div class="row-name">
           <div class="row-icon">${logo}</div>
           <div>
             <a class="name-link" href="${svc.url}" target="_blank" rel="noopener noreferrer">
-              <div class="name-primary">${svc.name}</div>
+              <div class="name-primary">${svc.name}${naTag}</div>
             </a>
             <div class="name-sub">${svc.sub}</div>
           </div>
@@ -691,18 +626,16 @@ function renderServices() {
   }).join('');
 }
 
+// ── CHECK ALL ─────────────────────────────────────────────────────────────────
 async function checkAll() {
   const btn = document.getElementById('refreshBtn');
   btn.classList.add('spinning');
   btn.disabled = true;
-
   await fetchAllStatuses();
-
   const t = new Date().toLocaleTimeString('en-CA',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
   document.getElementById('lastChecked').textContent = 'Updated ' + t;
   renderSummary();
   renderServices();
-
   btn.classList.remove('spinning');
   btn.disabled = false;
 }
@@ -710,7 +643,7 @@ async function checkAll() {
 // Auto-refresh every 5 minutes
 setInterval(checkAll, 5 * 60 * 1000);
 
-// Init — fetch live data immediately on page load
+// Init — render immediately with "Checking..." then fetch live data
 updateClock();
 setInterval(updateClock, 1000);
 renderSummary();
