@@ -418,20 +418,17 @@ function impactToStatus(imp) {
 const PROXIES = [
   url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
   url => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
-  url => `https://cors-anywhere.herokuapp.com/${url}`,
+  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
 ];
 
-async function fetchWithProxy(url, timeout = 8000) {
-  // First try direct (works for Cloudflare, GitHub, Anthropic, Zoom, Duo)
+async function fetchWithProxy(url, timeout = 9000) {
+  // First try direct
   try {
     const ctrl = new AbortController();
     const tid = setTimeout(() => ctrl.abort(), timeout);
     const r = await fetch(url, { signal: ctrl.signal });
     clearTimeout(tid);
-    if (r.ok) {
-      const text = await r.text();
-      return JSON.parse(text);
-    }
+    if (r.ok) return JSON.parse(await r.text());
   } catch(e) {}
 
   // Try each proxy
@@ -443,10 +440,9 @@ async function fetchWithProxy(url, timeout = 8000) {
       clearTimeout(tid);
       if (!r.ok) continue;
       const text = await r.text();
-      // allorigins wraps in {contents: "..."}
       try {
         const parsed = JSON.parse(text);
-        if (parsed && parsed.contents) return JSON.parse(parsed.contents);
+        if (parsed?.contents) return JSON.parse(parsed.contents);
         return parsed;
       } catch(e) { continue; }
     } catch(e) { continue; }
@@ -454,7 +450,52 @@ async function fetchWithProxy(url, timeout = 8000) {
   return null;
 }
 
-// ── STATUSPAGE.IO HELPER (used by Blackboard, Duo, Palo Alto, Zoom, Anthropic, GitHub, Cloudflare)
+// ── STATUSPAGE.IO OFFICIAL SDK — works from ANY browser, no CORS issues ───────
+// Uses Statuspage's own CDN-hosted widget script. We load it once,
+// then use it for services that block direct API calls (Claude, Zoom).
+let _spScriptLoaded = false;
+function loadStatusPageSDK() {
+  return new Promise(resolve => {
+    if (_spScriptLoaded || window.StatusPage) { resolve(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://cdn.statuspage.io/se-v2.js';
+    s.onload = () => { _spScriptLoaded = true; resolve(); };
+    s.onerror = () => resolve(); // fail silently
+    document.head.appendChild(s);
+  });
+}
+
+// Fetch via official Statuspage SDK using the page ID
+function fetchViaSDK(pageId) {
+  return new Promise(async (resolve) => {
+    await loadStatusPageSDK();
+    if (!window.StatusPage) { resolve(null); return; }
+    const timer = setTimeout(() => resolve(null), 8000);
+    try {
+      const sp = new window.StatusPage.page({ page: pageId });
+      sp.summary({
+        success: (data) => { clearTimeout(timer); resolve(data); },
+        error:   ()     => { clearTimeout(timer); resolve(null); }
+      });
+    } catch(e) { clearTimeout(timer); resolve(null); }
+  });
+}
+
+// Page IDs from Statuspage.io (found in each vendor's status page embed code)
+const STATUSPAGE_IDS = {
+  claude: 'tymt9n04zgry',   // status.claude.com
+  zoom:   'p0qjsrpn48vl',   // status.zoom.us
+};
+
+async function fetchViaSDKOrProxy(pageId, baseUrl) {
+  // Try official SDK first
+  const data = await fetchViaSDK(pageId);
+  if (data) return data;
+  // Fall back to proxy
+  return fetchWithProxy(`${baseUrl}/api/v2/summary.json`);
+}
+
+// ── STATUSPAGE.IO HELPER (Blackboard, Duo, Palo Alto via proxy) ───────────────
 async function fetchStatusPage(baseUrl, naFilter = false) {
   const data = await fetchWithProxy(`${baseUrl}/api/v2/summary.json`);
   if (!data) return { status:'unknown', label:'Unavailable' };
@@ -497,14 +538,28 @@ async function fetchGitHub() {
   }
 }
 
-// ── ANTHROPIC / CLAUDE — force through proxy (CORS blocked from GitHub Pages) ─
-const fetchAnthropic = () => fetchStatusPage('https://status.anthropic.com');
+// ── ANTHROPIC / CLAUDE — official Statuspage SDK (page ID: tymt9n04zgry) ──────
+async function fetchAnthropic() {
+  const data = await fetchViaSDKOrProxy(STATUSPAGE_IDS.claude, 'https://status.claude.com');
+  if (!data) return { status:'unknown', label:'Unavailable' };
+  const active = (data.incidents||[]).filter(i => i.status !== 'resolved');
+  if (!active.length) return indicatorToStatus(data.status?.indicator);
+  return impactToStatus(active[0].impact);
+}
 
 // ── OTHERS — via proxy chain ──────────────────────────────────────────────────
 const fetchBlackboard = () => fetchStatusPage('https://status.blackboard.com');
 const fetchDuo        = () => fetchStatusPage('https://status.duo.com');
 const fetchPaloAlto   = () => fetchStatusPage('https://status.paloaltonetworks.com');
-const fetchZoom       = () => fetchStatusPage('https://status.zoom.us');
+
+// ── ZOOM — official Statuspage SDK (page ID: p0qjsrpn48vl) ───────────────────
+async function fetchZoom() {
+  const data = await fetchViaSDKOrProxy(STATUSPAGE_IDS.zoom, 'https://status.zoom.us');
+  if (!data) return { status:'unknown', label:'Unavailable' };
+  const active = (data.incidents||[]).filter(i => i.status !== 'resolved');
+  if (!active.length) return indicatorToStatus(data.status?.indicator);
+  return impactToStatus(active[0].impact);
+}
 // ── AWS — via proxy, NA regions only ─────────────────────────────────────────
 async function fetchAWS() {
   try {
