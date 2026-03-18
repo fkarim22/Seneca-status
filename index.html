@@ -353,7 +353,7 @@ const SERVICES = [
     { id:"github", name:"GitHub",              sub:"Version Control · CI/CD",   tag:"DevOps", url:"https://www.githubstatus.com/" },
   ]},
   { category: "AI Services", items: [
-    { id:"claude", name:"Claude AI (Anthropic)", sub:"AI Assistant · API",     tag:"AI", url:"https://status.anthropic.com/" },
+    { id:"claude", name:"Claude AI (Anthropic)", sub:"AI Assistant · API",     tag:"AI", url:"https://status.claude.com/" },
     { id:"gemini", name:"Google Gemini",         sub:"Google AI · Workspace",  tag:"AI", url:"https://www.google.com/appsstatus/dashboard/" },
   ]},
   { category: "Telecommunications", items: [
@@ -497,17 +497,32 @@ async function fetchGitHub() {
   }
 }
 
-// ── ANTHROPIC — direct CORS ✅ ────────────────────────────────────────────────
+// ── ANTHROPIC / CLAUDE — correct URL is status.claude.com ────────────────────
 async function fetchAnthropic() {
-  try {
-    const r = await fetch('https://status.anthropic.com/api/v2/summary.json');
-    const d = await r.json();
-    const active = (d.incidents||[]).filter(i => i.status !== 'resolved');
-    if (!active.length) return indicatorToStatus(d.status?.indicator);
-    return impactToStatus(active[0].impact);
-  } catch(e) {
-    return fetchStatusPage('https://status.anthropic.com');
+  // Try direct first, then proxy fallback
+  const urls = [
+    'https://status.claude.com/api/v2/summary.json',
+    'https://status.anthropic.com/api/v2/summary.json',
+  ];
+  for (const url of urls) {
+    try {
+      const ctrl = new AbortController();
+      setTimeout(() => ctrl.abort(), 6000);
+      const r = await fetch(url, { signal: ctrl.signal });
+      if (!r.ok) continue;
+      const d = await r.json();
+      const active = (d.incidents||[]).filter(i => i.status !== 'resolved');
+      if (!active.length) return indicatorToStatus(d.status?.indicator);
+      return impactToStatus(active[0].impact);
+    } catch(e) { continue; }
   }
+  // Try via proxy
+  const data = await fetchWithProxy('https://status.claude.com/api/v2/summary.json');
+  if (!data) return { status:'unknown', label:'Unavailable' };
+  const active = (data.incidents||[]).filter(i => i.status !== 'resolved');
+  if (!active.length) return indicatorToStatus(data.status?.indicator);
+  return impactToStatus(active[0].impact);
+}
 }
 
 // ── OTHERS — via proxy chain ──────────────────────────────────────────────────
@@ -515,7 +530,6 @@ const fetchBlackboard = () => fetchStatusPage('https://status.blackboard.com');
 const fetchDuo        = () => fetchStatusPage('https://status.duo.com');
 const fetchPaloAlto   = () => fetchStatusPage('https://status.paloaltonetworks.com');
 const fetchZoom       = () => fetchStatusPage('https://status.zoom.us');
-
 // ── AWS — via proxy, NA regions only ─────────────────────────────────────────
 async function fetchAWS() {
   try {
