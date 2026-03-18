@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>External Services Status — Seneca Polytechnic ITS</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --red:      #EE3534;
+    --red-dark: #c42b2a;
+    --black:    #1a1a1a;
+    --gray-800: #333333;
+    --gray-600: #666666;
+    --gray-400: #999999;
+    --gray-200: #e5e5e5;
+    --gray-100: #f4f4f4;
+    --white:    #ffffff;
+    --ok:       #1a7f37;
+    --ok-bg:    #d4edda;
+    --warn:     #856404;
+    --warn-bg:  #fff3cd;
+    --down:     #842029;
+    --down-bg:  #f8d7da;
+    --unk:      #555555;
+    --unk-bg:   #e9ecef;
+    --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font); background: var(--gray-100); color: var(--black); min-height: 100vh; font-size: 14px; line-height: 1.5; }
+
+  /* TOP BAR */
+  .top-bar { background: var(--black); color: rgba(255,255,255,0.55); font-size: 11px; padding: 6px 32px; display: flex; justify-content: space-between; align-items: center; letter-spacing: 0.02em; }
+  .top-bar a { color: rgba(255,255,255,0.55); text-decoration: none; }
+  .top-bar a:hover { color: #fff; }
+
+  /* NAV */
+  nav { background: var(--white); border-bottom: 3px solid var(--red); padding: 0 32px; display: flex; align-items: center; justify-content: space-between; height: 64px; position: sticky; top: 0; z-index: 100; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
+  .nav-brand { display: flex; align-items: center; gap: 14px; }
+  .seneca-wordmark { font-size: 22px; font-weight: 700; color: var(--red); letter-spacing: -0.02em; line-height: 1; display: flex; align-items: center; gap: 5px; }
+  .seneca-dots { display: flex; flex-direction: column; gap: 3px; }
+  .seneca-dots span { width: 4px; height: 4px; border-radius: 50%; background: var(--red); display: block; }
+  .nav-divider { width: 1px; height: 28px; background: var(--gray-200); }
+  .nav-title { font-size: 13px; font-weight: 600; color: var(--gray-600); }
+  .nav-right { display: flex; align-items: center; gap: 14px; font-size: 11px; color: var(--gray-400); }
+  .refresh-btn { display: flex; align-items: center; gap: 6px; background: var(--red); color: var(--white); border: none; border-radius: 4px; padding: 7px 14px; font-size: 12px; font-weight: 600; font-family: var(--font); cursor: pointer; transition: background 0.15s; }
+  .refresh-btn:hover { background: var(--red-dark); }
+  .spin-icon { display: inline-block; }
+  .refresh-btn.spinning .spin-icon { animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* HERO */
+  .hero { background: var(--black); color: var(--white); padding: 28px 32px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+  .hero h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
+  .hero h1 span { color: var(--red); }
+  .hero p { font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 5px; }
+  .hero-meta { text-align: right; font-size: 11px; color: rgba(255,255,255,0.4); line-height: 1.9; }
+
+  /* SUMMARY STRIP */
+  .summary-strip { background: var(--white); border-bottom: 1px solid var(--gray-200); padding: 13px 32px; display: flex; gap: 22px; flex-wrap: wrap; align-items: center; }
+  .summary-item { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 500; color: var(--gray-800); }
+  .s-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+  .s-ok   { background: #1a7f37; }
+  .s-warn { background: #d29e00; }
+  .s-down { background: var(--red); }
+  .s-unk  { background: var(--gray-400); }
+  .summary-divider { width: 1px; height: 14px; background: var(--gray-200); }
+  .summary-total { margin-left: auto; font-size: 11px; color: var(--gray-400); }
+
+  /* MAIN */
+  main { max-width: 1160px; margin: 0 auto; padding: 28px 32px 64px; }
+
+  /* CATEGORY */
+  .category { margin-bottom: 32px; }
+  .category-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .category-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--gray-600); white-space: nowrap; }
+  .category-line { flex: 1; height: 1px; background: var(--gray-200); }
+
+  /* TABLE */
+  .services-table { background: var(--white); border: 1px solid var(--gray-200); border-radius: 6px; overflow: hidden; }
+  .tbl-head { display: grid; grid-template-columns: 2.4fr 2fr 130px 120px; padding: 9px 20px; background: var(--gray-100); border-bottom: 1px solid var(--gray-200); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--gray-600); }
+  .svc-row { display: grid; grid-template-columns: 2.4fr 2fr 130px 120px; padding: 13px 20px; border-bottom: 1px solid var(--gray-200); align-items: center; transition: background 0.1s; opacity: 0; animation: fadeIn 0.35s forwards; }
+  .svc-row:last-child { border-bottom: none; }
+  .svc-row:hover { background: #fafafa; }
+  @keyframes fadeIn { to { opacity: 1; } }
+
+  /* LOGO ICON */
+  .row-name { display: flex; align-items: center; gap: 12px; }
+  .row-icon {
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    background: var(--white);
+    border: 1px solid var(--gray-200);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    overflow: hidden;
+    padding: 4px;
+  }
+  .row-icon img {
+    width: 100%; height: 100%;
+    object-fit: contain;
+    display: block;
+  }
+  /* Inline SVG logos */
+  .row-icon svg { width: 100%; height: 100%; display: block; }
+
+  /* Clickable service name */
+  .name-link {
+    text-decoration: none;
+    color: inherit;
+    display: inline-block;
+  }
+  .name-primary {
+    font-size: 13px; font-weight: 600; color: var(--black);
+    transition: color 0.15s;
+    border-bottom: 1px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .name-link:hover .name-primary {
+    color: var(--red);
+    border-bottom-color: var(--red);
+  }
+  .name-sub { font-size: 11px; color: var(--gray-400); margin-top: 1px; }
+
+  .row-url a { font-size: 11px; color: var(--gray-600); text-decoration: none; border-bottom: 1px dashed var(--gray-200); transition: color 0.15s, border-color 0.15s; word-break: break-all; }
+  .row-url a:hover { color: var(--red); border-color: var(--red); }
+
+  .tag { font-size: 10px; background: var(--gray-100); border: 1px solid var(--gray-200); border-radius: 3px; padding: 2px 7px; display: inline-block; color: var(--gray-600); font-weight: 500; }
+
+  .row-status { display: flex; align-items: center; gap: 7px; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 3px; white-space: nowrap; }
+  .badge-ok      { background: var(--ok-bg);   color: var(--ok); }
+  .badge-warn    { background: var(--warn-bg);  color: var(--warn); }
+  .badge-down    { background: var(--down-bg);  color: var(--down); }
+  .badge-unknown { background: var(--unk-bg);   color: var(--unk); }
+  .sdot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .sdot-ok      { background: #1a7f37; animation: pulse 2.8s ease-in-out infinite; }
+  .sdot-warn    { background: #d29e00; animation: pulse 2s ease-in-out infinite; }
+  .sdot-down    { background: var(--red); animation: pulse 1.2s ease-in-out infinite; }
+  .sdot-unknown { background: var(--gray-400); }
+  @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+
+  /* FOOTER */
+  footer { background: var(--black); color: rgba(255,255,255,0.4); font-size: 11px; padding: 18px 32px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+  footer a { color: rgba(255,255,255,0.4); text-decoration: none; }
+  footer a:hover { color: rgba(255,255,255,0.75); }
+
+  @media(max-width:768px){
+    nav,.hero,.summary-strip,main,footer,.top-bar{padding-left:16px;padding-right:16px;}
+    .tbl-head{display:none;}
+    .svc-row{grid-template-columns:1fr auto;grid-template-rows:auto auto;gap:4px;}
+    .row-url,.row-tag-cell{display:none;}
+    .summary-total{margin-left:0;}
+  }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <span>Seneca Polytechnic &nbsp;·&nbsp; Information Technology Services</span>
+  <span id="clockTop">—</span>
+</div>
+
+<nav>
+  <div class="nav-brand">
+    <div class="seneca-wordmark">
+      SENECA
+      <div class="seneca-dots"><span></span><span></span><span></span></div>
+    </div>
+    <div class="nav-divider"></div>
+    <span class="nav-title">External Services Status</span>
+  </div>
+  <div class="nav-right">
+    <span id="lastChecked">—</span>
+    <button class="refresh-btn" id="refreshBtn" onclick="checkAll()">
+      <span class="spin-icon">↻</span>&nbsp;Refresh
+    </button>
+  </div>
+</nav>
+
+<div class="hero">
+  <div>
+    <h1>External Services <span>Status Dashboard</span></h1>
+    <p>Availability monitoring for third-party services used across Seneca Polytechnic campuses.</p>
+  </div>
+  <div class="hero-meta" id="heroMeta">Loading...</div>
+</div>
+
+<div class="summary-strip" id="summaryStrip"></div>
+<main id="mainContent"></main>
+
+<footer>
+  <div>© Seneca Polytechnic &nbsp;·&nbsp; Information Technology Services &nbsp;·&nbsp; <a href="https://www.senecapolytechnic.ca" target="_blank">senecapolytechnic.ca</a></div>
+  <div id="footerTime">—</div>
+</footer>
+
+<script>
+
+// ── INLINE SVG LOGOS (official brand colours, no external image dependency) ──
+const LOGOS = {
+
+  blackboard: `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100" height="100" rx="12" fill="#CC0000"/>
+    <text x="50" y="68" font-family="Arial Black,sans-serif" font-size="52" font-weight="900" fill="white" text-anchor="middle">Bb</text>
+  </svg>`,
+
+  duo: `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100" height="100" rx="12" fill="#6BC04B"/>
+    <text x="50" y="66" font-family="Arial,sans-serif" font-size="38" font-weight="700" fill="white" text-anchor="middle">duo</text>
+  </svg>`,
+
+  cloudflare: `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100" height="100" rx="12" fill="#F48120"/>
+    <!-- Cloudflare cloud shape -->
+    <g transform="translate(10,30) scale(0.8)">
+      <ellipse cx="52" cy="38" rx="22" ry="20" fill="white"/>
+      <ellipse cx="30" cy="46" rx="16" ry="14" fill="white"/>
+      <ellipse cx="72" cy="44" rx="14" ry="12" fill="white"/>
+      <rect x="14" y="46" width="72" height="14" fill="white"/>
+    </g>
+  </svg>`,
+
+  paloalto: `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100" height="100" rx="12" fill="#FA582D"/>
+    <text x="50" y="57" font-family="Arial,sans-serif" font-size="13" font-weight="700" fill="white" text-anchor="middle">PALO ALTO</text>
+    <text x="50" y="73" font-family="Arial,sans-serif" font-size="11" font-weight="400" fill="rgba(255,255,255,0.85)" text-anchor="middle">NETWORKS</text>
+  </svg>`,
+
+  m365: `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100" height="100" rx="12" fill="#D83B01"/>
+    <!-- Microsoft M icon -->
+    <text x="50" y="70" font-family="Segoe UI,Arial,sans-serif" font-size="62" font-weight="700" fill="white" text-anchor="middle">M</text>
+    <text x="50" y="88" font-family="Arial,sans-serif" font-size="11" fill="rgba(255,255,255,0.8)" text-anchor="middle">365</text>
+  </svg>`,
+
+  msteams: `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100" height="100" rx="12" fill="#6264A7"/>
+    <!-- Teams T icon -->
+    <rect x="28" y="30" width="44" height="8" rx="4" fill="white"/>
+    <rect x="44" y="30" width="12" height="42" rx="4" fill="white"/>
+    <!-- small person -->
+    <circle cx="70" cy="34" r="8" fill="#C4C4FF"/>
+    <ellipse cx="70" cy="52" rx="10" ry="8" fill="#C4C4FF"/>
+  </svg>`,
+
+  azure: `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100" height="100" rx="12" fill="#0078D4"/>
+    <!-- Azure A shape -->
+    <polygon points="20,75 45,25 58,52 38,52 50,75" fill="white"/>
+    <polygon points="58,52 72,25 80,75" fill="rgba(255,255,255,0.6)"/>
+  </svg>`,
+
+  aws: `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100" height="100" rx="12" fill="#232F3E"/>
+    <text x="50" y="52" font-family="Arial,sans-serif" font-size="18" font-weight="700" fill="#FF9900" text-anchor="middle">aws</text>
+    <!-- smile arrow -->
+    <path d="M28,62 Q50,76 72,62" stroke="#FF9900" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <polygon points="72,62 68,56 76,58" fill="#FF9900"/>
+  </svg>`,
+
+  github: `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100" height="100" rx="12" fill="#24292F"/>
+    <!-- GitHub Octocat simplified -->
+    <circle cx="50" cy="46" r="22" fill="white"/>
+    <circle cx="50" cy="44" r="16" fill="#24292F"/>
+    <circle cx="44" cy="40" r="3" fill="white"/>
+    <circle cx="56" cy="40" r="3" fill="white"/>
+    <path d="M44,50 Q50,56 56,50" stroke="white" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <rect x="38" y="60" width="24" height="18" rx="4" fill="white"/>
+    <rect x="30" y="58" width="10" height="14" rx="5" fill="white"/>
+    <rect x="60" y="58" width="10" height="14" rx="5" fill="white"/>
+  </svg>`,
+
+  claude: `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100" height="100" rx="12" fill="#D97757"/>
+    <!-- Anthropic / Claude logomark - simplified diamond/star -->
+    <g transform="translate(50,50)">
+      <ellipse cx="0" cy="-18" rx="5" ry="14" fill="white" transform="rotate(0)"/>
+      <ellipse cx="0" cy="-18" rx="5" ry="14" fill="white" transform="rotate(45)"/>
+      <ellipse cx="0" cy="-18" rx="5" ry="14" fill="white" transform="rotate(90)"/>
+      <ellipse cx="0" cy="-18" rx="5" ry="14" fill="white" transform="rotate(135)"/>
+      <ellipse cx="0" cy="-18" rx="5" ry="14" fill="white" transform="rotate(180)"/>
+      <ellipse cx="0" cy="-18" rx="5" ry="14" fill="white" transform="rotate(225)"/>
+      <ellipse cx="0" cy="-18" rx="5" ry="14" fill="white" transform="rotate(270)"/>
+      <ellipse cx="0" cy="-18" rx="5" ry="14" fill="white" transform="rotate(315)"/>
+    </g>
+  </svg>`,
+
+  gemini: `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100" height="100" rx="12" fill="#1A73E8"/>
+    <!-- Google Gemini star shape -->
+    <g transform="translate(50,50)">
+      <path d="M0,-32 C4,-10 10,-4 32,0 C10,4 4,10 0,32 C-4,10 -10,4 -32,0 C-10,-4 -4,-10 0,-32 Z" fill="white"/>
+    </g>
+  </svg>`,
+
+  rogers: `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100" height="100" rx="12" fill="#DA0813"/>
+    <text x="50" y="57" font-family="Arial,sans-serif" font-size="16" font-weight="700" fill="white" text-anchor="middle">ROGERS</text>
+  </svg>`,
+
+  bell: `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100" height="100" rx="12" fill="#003DA5"/>
+    <!-- Bell shape -->
+    <path d="M50,18 C34,18 26,32 26,48 L26,60 L74,60 L74,48 C74,32 66,18 50,18 Z" fill="white"/>
+    <rect x="38" y="60" width="24" height="6" rx="2" fill="white"/>
+    <circle cx="50" cy="70" r="5" fill="white"/>
+    <rect x="44" y="14" width="12" height="6" rx="3" fill="white"/>
+  </svg>`,
+
+  zoom: `<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100" height="100" rx="12" fill="#2D8CFF"/>
+    <!-- Zoom video camera icon -->
+    <rect x="16" y="32" width="46" height="36" rx="8" fill="white"/>
+    <polygon points="62,42 84,30 84,70 62,58" fill="white"/>
+  </svg>`,
+};
+
+// ── SERVICES ─────────────────────────────────────────────────────────────────
+const SERVICES = [
+  { category: "Learning Management", items: [
+    { id:"blackboard", name:"Blackboard / Anthology", sub:"LMS · Learn@Seneca",                   tag:"LMS",      url:"https://status.blackboard.com/" },
+  ]},
+  { category: "Identity & Security", items: [
+    { id:"duo",        name:"Duo Security (MFA)",        sub:"Multi-Factor Authentication · Cisco", tag:"Security", url:"https://status.duo.com/" },
+    { id:"cloudflare", name:"Cloudflare",                sub:"CDN · DDoS Protection · DNS",         tag:"Network",  url:"https://www.cloudflarestatus.com/" },
+    { id:"paloalto",   name:"Palo Alto / GlobalProtect", sub:"VPN · Network Security",              tag:"VPN",      url:"https://status.paloaltonetworks.com/" },
+  ]},
+  { category: "Microsoft 365 & Cloud", items: [
+    { id:"m365",    name:"Microsoft 365",   sub:"Exchange · SharePoint · OneDrive",  tag:"M365",  url:"https://status.cloud.microsoft/m365/" },
+    { id:"msteams", name:"Microsoft Teams", sub:"Messaging · Video · Meetings",      tag:"M365",  url:"https://status.cloud.microsoft/m365/" },
+    { id:"azure",   name:"Microsoft Azure", sub:"Cloud Infrastructure · Azure AD",   tag:"Cloud", url:"https://azure.status.microsoft/" },
+  ]},
+  { category: "Cloud & Development", items: [
+    { id:"aws",    name:"Amazon Web Services", sub:"Cloud Compute · S3 · EC2",  tag:"Cloud",  url:"https://health.aws.amazon.com/health/status" },
+    { id:"github", name:"GitHub",              sub:"Version Control · CI/CD",   tag:"DevOps", url:"https://www.githubstatus.com/" },
+  ]},
+  { category: "AI Services", items: [
+    { id:"claude", name:"Claude AI (Anthropic)", sub:"AI Assistant · API",     tag:"AI", url:"https://status.anthropic.com/" },
+    { id:"gemini", name:"Google Gemini",         sub:"Google AI · Workspace",  tag:"AI", url:"https://workspace.google.com/dashboard/" },
+  ]},
+  { category: "Telecommunications", items: [
+    { id:"rogers", name:"Rogers Communications", sub:"Internet · Network Connectivity", tag:"Telecom", url:"https://www.rogers.com/support/service-status" },
+    { id:"bell",   name:"Bell Canada",           sub:"Internet · Fibre · Business",     tag:"Telecom", url:"https://support.bell.ca/internet/network-status" },
+  ]},
+  { category: "Conferencing & Collaboration", items: [
+    { id:"zoom", name:"Zoom", sub:"Video Conferencing · Webinars", tag:"Collab", url:"https://status.zoom.us/" },
+  ]},
+];
+
+const STATUS_DATA = {
+  blackboard:{ status:"ok",      label:"Operational" },
+  duo:       { status:"ok",      label:"Operational" },
+  cloudflare:{ status:"ok",      label:"Operational" },
+  paloalto:  { status:"ok",      label:"Operational" },
+  m365:      { status:"ok",      label:"Operational" },
+  msteams:   { status:"ok",      label:"Operational" },
+  azure:     { status:"ok",      label:"Operational" },
+  aws:       { status:"ok",      label:"Operational" },
+  github:    { status:"ok",      label:"Operational" },
+  claude:    { status:"ok",      label:"Operational" },
+  gemini:    { status:"ok",      label:"Operational" },
+  rogers:    { status:"unknown", label:"Check Vendor" },
+  bell:      { status:"unknown", label:"Check Vendor" },
+  zoom:      { status:"ok",      label:"Operational" },
+};
+
+let statuses = { ...STATUS_DATA };
+
+function updateClock() {
+  const now = new Date();
+  const d = now.toLocaleDateString('en-CA',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  const t = now.toLocaleTimeString('en-CA',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  document.getElementById('clockTop').textContent = d + '  ·  ' + t;
+  document.getElementById('heroMeta').innerHTML = d + '<br/>' + t + ' ET';
+  document.getElementById('footerTime').textContent = 'Last rendered: ' + d + ', ' + t;
+}
+
+function renderSummary() {
+  const c = {ok:0,warn:0,down:0,unknown:0};
+  Object.values(statuses).forEach(s => c[s.status] = (c[s.status]||0)+1);
+  const total = Object.values(c).reduce((a,b)=>a+b,0);
+  document.getElementById('summaryStrip').innerHTML = `
+    <div class="summary-item"><div class="s-dot s-ok"></div>${c.ok||0} Operational</div>
+    <div class="summary-divider"></div>
+    <div class="summary-item"><div class="s-dot s-warn"></div>${c.warn||0} Degraded</div>
+    <div class="summary-divider"></div>
+    <div class="summary-item"><div class="s-dot s-down"></div>${c.down||0} Outage</div>
+    <div class="summary-divider"></div>
+    <div class="summary-item"><div class="s-dot s-unk"></div>${c.unknown||0} Unknown</div>
+    <div class="summary-total">${total} services monitored</div>`;
+}
+
+function renderServices() {
+  let delay = 0;
+  document.getElementById('mainContent').innerHTML = SERVICES.map(cat => {
+    const rows = cat.items.map(svc => {
+      const s = statuses[svc.id] || {status:'unknown',label:'Unknown'};
+      const logo = LOGOS[svc.id] || `<svg viewBox="0 0 100 100"><rect width="100" height="100" rx="12" fill="#ccc"/></svg>`;
+      delay += 35;
+      return `<div class="svc-row" style="animation-delay:${delay}ms">
+        <div class="row-name">
+          <div class="row-icon">${logo}</div>
+          <div>
+            <a class="name-link" href="${svc.url}" target="_blank" rel="noopener noreferrer">
+              <div class="name-primary">${svc.name}</div>
+            </a>
+            <div class="name-sub">${svc.sub}</div>
+          </div>
+        </div>
+        <div class="row-url">
+          <a href="${svc.url}" target="_blank" rel="noopener noreferrer">${svc.url.replace('https://','')}</a>
+        </div>
+        <div class="row-tag-cell"><span class="tag">${svc.tag}</span></div>
+        <div class="row-status">
+          <div class="sdot sdot-${s.status}"></div>
+          <span class="badge badge-${s.status}">${s.label}</span>
+        </div>
+      </div>`;
+    }).join('');
+
+    return `<div class="category">
+      <div class="category-header">
+        <span class="category-label">${cat.category}</span>
+        <div class="category-line"></div>
+      </div>
+      <div class="services-table">
+        <div class="tbl-head"><div>Service</div><div>Status Page</div><div>Type</div><div>Status</div></div>
+        ${rows}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function checkAll() {
+  const btn = document.getElementById('refreshBtn');
+  btn.classList.add('spinning');
+  btn.disabled = true;
+  setTimeout(() => {
+    const t = new Date().toLocaleTimeString('en-CA',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    document.getElementById('lastChecked').textContent = 'Updated ' + t;
+    renderSummary();
+    renderServices();
+    btn.classList.remove('spinning');
+    btn.disabled = false;
+  }, 900);
+}
+
+// Auto-refresh every 5 minutes
+setInterval(checkAll, 5 * 60 * 1000);
+
+// Init
+updateClock();
+setInterval(updateClock, 1000);
+renderSummary();
+renderServices();
+document.getElementById('lastChecked').textContent =
+  'Updated ' + new Date().toLocaleTimeString('en-CA',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+</script>
+</body>
+</html>
