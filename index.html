@@ -366,16 +366,14 @@ const SERVICES = [
 ];
 
 // ══════════════════════════════════════════════════════════════════════════════
-// LIVE STATUS SYSTEM
-// ── UptimeRobot API (works from GitHub Pages — no CORS issues)
-//    Monitors ALL 13 services. UptimeRobot pings each vendor every 5 min
-//    and stores up/down result server-side — we just fetch the result.
-// ── Vendor APIs with native CORS support (Cloudflare, GitHub, Anthropic)
-//    These allow direct browser requests — no proxy needed.
-//    Used for North America–specific filtering on top of UptimeRobot.
+// ══════════════════════════════════════════════════════════════════════════════
+// STATUS SYSTEM — Multi-proxy fallback + direct CORS where supported
+// Most vendor status APIs block direct browser requests (CORS).
+// We use a chain of free CORS proxies as fallback. If one is down,
+// the next is tried automatically. Cloudflare, GitHub, Anthropic allow
+// direct requests so no proxy needed for those.
 // ══════════════════════════════════════════════════════════════════════════════
 
-// Default — show "Checking..." until first fetch completes
 let statuses = {
   blackboard: { status:'unknown', label:'Checking...' },
   duo:        { status:'unknown', label:'Checking...' },
@@ -393,22 +391,13 @@ let statuses = {
   zoom:       { status:'unknown', label:'Checking...' },
 };
 
-// ══════════════════════════════════════════════════════════════════════════════
-// FULLY CORS-SAFE STATUS SYSTEM
-// Every vendor API below explicitly allows browser requests (CORS: *)
-// No proxy needed. No UptimeRobot API (blocked by CORS from browsers).
-// UptimeRobot still runs in the background as your uptime monitor —
-// we just don't call its API from the browser anymore.
-// ══════════════════════════════════════════════════════════════════════════════
-
 const NA_KEYWORDS = [
   'north america','canada','united states',' us ','usa',
   'toronto','ontario','americas','ca-central','us-east','us-west'
 ];
 function hasNA(t) {
   if (!t) return false;
-  const l = t.toLowerCase();
-  return NA_KEYWORDS.some(k => l.includes(k));
+  return NA_KEYWORDS.some(k => t.toLowerCase().includes(k));
 }
 function indicatorToStatus(ind) {
   if (!ind) return { status:'ok', label:'Operational' };
@@ -417,23 +406,83 @@ function indicatorToStatus(ind) {
   if (ind === 'minor' || ind.includes('degraded') || ind.includes('partial')) return { status:'warn', label:'Degraded' };
   return { status:'down', label:'Outage' };
 }
+function impactToStatus(imp) {
+  if (!imp) return { status:'ok', label:'Operational' };
+  imp = imp.toLowerCase();
+  if (imp === 'critical' || imp === 'major') return { status:'down', label:'Outage' };
+  if (imp === 'minor' || imp === 'none') return { status:'ok', label:'Operational' };
+  return { status:'warn', label:'Degraded' };
+}
 
-// ── CLOUDFLARE — CORS ✅ — NA regional components ────────────────────────────
+// ── CORS PROXY CHAIN — tries each proxy in order until one works ──────────────
+const PROXIES = [
+  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  url => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+  url => `https://cors-anywhere.herokuapp.com/${url}`,
+];
+
+async function fetchWithProxy(url, timeout = 8000) {
+  // First try direct (works for Cloudflare, GitHub, Anthropic, Zoom, Duo)
+  try {
+    const ctrl = new AbortController();
+    const tid = setTimeout(() => ctrl.abort(), timeout);
+    const r = await fetch(url, { signal: ctrl.signal });
+    clearTimeout(tid);
+    if (r.ok) {
+      const text = await r.text();
+      return JSON.parse(text);
+    }
+  } catch(e) {}
+
+  // Try each proxy
+  for (const proxyFn of PROXIES) {
+    try {
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), timeout);
+      const r = await fetch(proxyFn(url), { signal: ctrl.signal });
+      clearTimeout(tid);
+      if (!r.ok) continue;
+      const text = await r.text();
+      // allorigins wraps in {contents: "..."}
+      try {
+        const parsed = JSON.parse(text);
+        if (parsed && parsed.contents) return JSON.parse(parsed.contents);
+        return parsed;
+      } catch(e) { continue; }
+    } catch(e) { continue; }
+  }
+  return null;
+}
+
+// ── STATUSPAGE.IO HELPER (used by Blackboard, Duo, Palo Alto, Zoom, Anthropic, GitHub, Cloudflare)
+async function fetchStatusPage(baseUrl, naFilter = false) {
+  const data = await fetchWithProxy(`${baseUrl}/api/v2/summary.json`);
+  if (!data) return { status:'unknown', label:'Unavailable' };
+  const active = (data.incidents||[]).filter(i => i.status !== 'resolved');
+  if (!active.length) return indicatorToStatus(data.status?.indicator);
+  if (naFilter) {
+    const naInc = active.filter(i => hasNA(i.name + ' ' + (i.incident_updates?.[0]?.body||'')));
+    if (!naInc.length) return { status:'ok', label:'Operational' };
+    return impactToStatus(naInc[0].impact);
+  }
+  return impactToStatus(active[0].impact);
+}
+
+// ── CLOUDFLARE — direct CORS ✅ — NA regional components ─────────────────────
 async function fetchCloudflare() {
   try {
     const r = await fetch('https://www.cloudflarestatus.com/api/v2/summary.json');
     const d = await r.json();
     const na = (d.components||[]).filter(c => c.name?.toLowerCase().includes('north america'));
     if (!na.length) return indicatorToStatus(d.status?.indicator);
-    const worst = na.reduce((acc, c) => {
-      const s = indicatorToStatus(c.status);
-      return ['down','warn','ok','unknown'].indexOf(s.status) < ['down','warn','ok','unknown'].indexOf(acc.status) ? s : acc;
-    }, { status:'ok', label:'Operational' });
-    return worst;
-  } catch(e) { return { status:'unknown', label:'Unavailable' }; }
+    const rank = s => ({down:3,warn:2,ok:1,unknown:0}[s]||0);
+    return na.map(c => indicatorToStatus(c.status)).reduce((a,b) => rank(a.status) >= rank(b.status) ? a : b);
+  } catch(e) {
+    return fetchStatusPage('https://www.cloudflarestatus.com', true);
+  }
 }
 
-// ── GITHUB — CORS ✅ — NA incident filter ────────────────────────────────────
+// ── GITHUB — direct CORS ✅ ───────────────────────────────────────────────────
 async function fetchGitHub() {
   try {
     const r = await fetch('https://www.githubstatus.com/api/v2/summary.json');
@@ -442,211 +491,129 @@ async function fetchGitHub() {
     if (!active.length) return { status:'ok', label:'Operational' };
     const naInc = active.filter(i => hasNA(i.name + ' ' + (i.incident_updates?.[0]?.body||'')));
     if (!naInc.length) return { status:'ok', label:'Operational' };
-    const imp = naInc[0].impact;
-    return (imp==='critical'||imp==='major') ? { status:'down', label:'Outage' } : { status:'warn', label:'Degraded' };
-  } catch(e) { return { status:'unknown', label:'Unavailable' }; }
+    return impactToStatus(naInc[0].impact);
+  } catch(e) {
+    return fetchStatusPage('https://www.githubstatus.com', true);
+  }
 }
 
-// ── ANTHROPIC / CLAUDE — CORS ✅ ─────────────────────────────────────────────
+// ── ANTHROPIC — direct CORS ✅ ────────────────────────────────────────────────
 async function fetchAnthropic() {
   try {
     const r = await fetch('https://status.anthropic.com/api/v2/summary.json');
     const d = await r.json();
     const active = (d.incidents||[]).filter(i => i.status !== 'resolved');
     if (!active.length) return indicatorToStatus(d.status?.indicator);
-    const imp = active[0].impact;
-    return (imp==='critical'||imp==='major') ? { status:'down', label:'Outage' } : { status:'warn', label:'Degraded' };
-  } catch(e) { return { status:'unknown', label:'Unavailable' }; }
+    return impactToStatus(active[0].impact);
+  } catch(e) {
+    return fetchStatusPage('https://status.anthropic.com');
+  }
 }
 
-// ── ZOOM — CORS ✅ ────────────────────────────────────────────────────────────
-async function fetchZoom() {
-  try {
-    const r = await fetch('https://status.zoom.us/api/v2/summary.json');
-    const d = await r.json();
-    const active = (d.incidents||[]).filter(i => i.status !== 'resolved');
-    if (!active.length) return indicatorToStatus(d.status?.indicator);
-    const imp = active[0].impact;
-    return (imp==='critical'||imp==='major') ? { status:'down', label:'Outage' } : { status:'warn', label:'Degraded' };
-  } catch(e) { return { status:'unknown', label:'Unavailable' }; }
-}
+// ── OTHERS — via proxy chain ──────────────────────────────────────────────────
+const fetchBlackboard = () => fetchStatusPage('https://status.blackboard.com');
+const fetchDuo        = () => fetchStatusPage('https://status.duo.com');
+const fetchPaloAlto   = () => fetchStatusPage('https://status.paloaltonetworks.com');
+const fetchZoom       = () => fetchStatusPage('https://status.zoom.us');
 
-// ── DUO — CORS ✅ ─────────────────────────────────────────────────────────────
-async function fetchDuo() {
-  try {
-    const r = await fetch('https://status.duo.com/api/v2/summary.json');
-    const d = await r.json();
-    const active = (d.incidents||[]).filter(i => i.status !== 'resolved');
-    if (!active.length) return indicatorToStatus(d.status?.indicator);
-    const imp = active[0].impact;
-    return (imp==='critical'||imp==='major') ? { status:'down', label:'Outage' } : { status:'warn', label:'Degraded' };
-  } catch(e) { return { status:'unknown', label:'Unavailable' }; }
-}
-
-// ── BLACKBOARD — CORS ✅ ──────────────────────────────────────────────────────
-async function fetchBlackboard() {
-  try {
-    const r = await fetch('https://status.blackboard.com/api/v2/summary.json');
-    const d = await r.json();
-    const active = (d.incidents||[]).filter(i => i.status !== 'resolved');
-    if (!active.length) return indicatorToStatus(d.status?.indicator);
-    const imp = active[0].impact;
-    return (imp==='critical'||imp==='major') ? { status:'down', label:'Outage' } : { status:'warn', label:'Degraded' };
-  } catch(e) { return { status:'unknown', label:'Unavailable' }; }
-}
-
-// ── PALO ALTO — CORS ✅ ───────────────────────────────────────────────────────
-async function fetchPaloAlto() {
-  try {
-    const r = await fetch('https://status.paloaltonetworks.com/api/v2/summary.json');
-    const d = await r.json();
-    const active = (d.incidents||[]).filter(i => i.status !== 'resolved');
-    if (!active.length) return indicatorToStatus(d.status?.indicator);
-    const imp = active[0].impact;
-    return (imp==='critical'||imp==='major') ? { status:'down', label:'Outage' } : { status:'warn', label:'Degraded' };
-  } catch(e) { return { status:'unknown', label:'Unavailable' }; }
-}
-
-// ── AWS — CORS ✅ — NA regions only ──────────────────────────────────────────
+// ── AWS — via proxy, NA regions only ─────────────────────────────────────────
 async function fetchAWS() {
   try {
-    // AWS service health dashboard RSS — publicly accessible
-    const r = await fetch('https://status.aws.amazon.com/rss/all.rss', { mode: 'cors' });
-    if (!r.ok) throw new Error('AWS rss failed');
-    const text = await r.text();
-    const parser = new DOMParser();
-    const xml = parser.parseFromString(text, 'text/xml');
-    const items = Array.from(xml.querySelectorAll('item'));
-    const naRegions = ['us-east','us-west','ca-central','us-gov','north america'];
-    const naActive = items.filter(item => {
-      const title = item.querySelector('title')?.textContent || '';
-      const desc  = item.querySelector('description')?.textContent || '';
-      const combined = (title + ' ' + desc).toLowerCase();
-      const isResolved = combined.includes('[resolved]') || combined.includes('resolved');
-      return !isResolved && naRegions.some(reg => combined.includes(reg));
-    });
-    if (naActive.length) return { status:'warn', label:'Degraded' };
-    return { status:'ok', label:'Operational' };
+    const data = await fetchWithProxy('https://health.aws.amazon.com/health/status');
+    if (!data) return { status:'ok', label:'Operational' };
+    const naRegions = ['us-east','us-west','ca-central'];
+    const current = data.archive?.current || [];
+    const naIssues = current.filter(s =>
+      naRegions.some(r => (s.region||'').includes(r)) && s.status !== 'closed'
+    );
+    return naIssues.length ? { status:'warn', label:'Degraded' } : { status:'ok', label:'Operational' };
   } catch(e) { return { status:'ok', label:'Operational' }; }
 }
 
-// ── MICROSOFT 365 & TEAMS — use overall component status page ────────────────
-// Microsoft blocks CORS on their status RSS/API — use their public summary page
-// We check their status JSON which is accessible
-async function fetchMicrosoft() {
-  try {
-    const r = await fetch('https://www.microsoft365servicestatus.com/api/status');
-    if (!r.ok) throw new Error();
-    const d = await r.json();
-    // Look for any service with NA issues
-    const services = d.ServiceStatus || [];
-    const naIssue = services.some(s => {
-      const name = (s.Name||'').toLowerCase();
-      const status = (s.Status||'').toLowerCase();
-      return status !== 'servicedegraded' && status !== 'restoring' ? false :
-        hasNA(s.Name + ' ' + (s.Description||''));
-    });
-    return naIssue
-      ? { status:'warn', label:'Degraded' }
-      : { status:'ok', label:'Operational' };
-  } catch(e) {
-    // Fallback: try the public status indicator
-    try {
-      const r2 = await fetch('https://status.cloud.microsoft/api/health');
-      const d2 = await r2.json();
-      const overall = d2?.status?.toLowerCase() || 'ok';
-      if (overall.includes('degraded') || overall.includes('incident')) return { status:'warn', label:'Degraded' };
-      return { status:'ok', label:'Operational' };
-    } catch(e2) {
-      return { status:'ok', label:'Operational' };
-    }
-  }
-}
-
-// ── AZURE — public status JSON ───────────────────────────────────────────────
+// ── AZURE — via proxy ─────────────────────────────────────────────────────────
 async function fetchAzure() {
   try {
-    const r = await fetch('https://azure.status.microsoft/api/v2/status.json');
-    const d = await r.json();
-    return indicatorToStatus(d.status?.indicator);
+    const data = await fetchWithProxy('https://azure.status.microsoft/api/v2/status.json');
+    if (!data) return { status:'ok', label:'Operational' };
+    return indicatorToStatus(data.status?.indicator);
   } catch(e) { return { status:'ok', label:'Operational' }; }
 }
 
-// ── GOOGLE GEMINI — Google Workspace status ───────────────────────────────────
+// ── MICROSOFT 365 & TEAMS — via proxy ────────────────────────────────────────
+async function fetchMicrosoft() {
+  try {
+    const data = await fetchWithProxy('https://status.cloud.microsoft/api/health');
+    if (!data) return { status:'ok', label:'Operational' };
+    const ind = (data.status || data.Status || '').toLowerCase();
+    if (!ind || ind === 'servicedegradation') return { status:'warn', label:'Degraded' };
+    if (ind.includes('outage') || ind.includes('incident')) return { status:'down', label:'Outage' };
+    return { status:'ok', label:'Operational' };
+  } catch(e) { return { status:'ok', label:'Operational' }; }
+}
+
+// ── GOOGLE GEMINI — via proxy ─────────────────────────────────────────────────
 async function fetchGemini() {
   try {
-    const r = await fetch('https://www.google.com/appsstatus/json/en');
-    const d = await r.json();
-    // Look for Gemini or AI services with issues
-    const products = d.products || [];
-    const gemini = products.find(p => (p.name||'').toLowerCase().includes('gemini') ||
-                                       (p.name||'').toLowerCase().includes('bard'));
-    if (!gemini) return { status:'ok', label:'Operational' };
-    const status = (gemini.status||'').toLowerCase();
-    if (status === 'ok' || status === '') return { status:'ok', label:'Operational' };
-    if (status.includes('disruption') || status.includes('degraded')) return { status:'warn', label:'Degraded' };
-    if (status.includes('outage') || status.includes('down')) return { status:'down', label:'Outage' };
-    return { status:'ok', label:'Operational' };
+    const data = await fetchWithProxy('https://www.google.com/appsstatus/json/en');
+    if (!data) return { status:'ok', label:'Operational' };
+    const products = data.products || [];
+    const gem = products.find(p =>
+      (p.name||'').toLowerCase().includes('gemini') ||
+      (p.name||'').toLowerCase().includes('vertex') ||
+      (p.name||'').toLowerCase().includes('ai')
+    );
+    if (!gem) return { status:'ok', label:'Operational' };
+    return indicatorToStatus(gem.status);
   } catch(e) { return { status:'ok', label:'Operational' }; }
 }
 
-// ── ROGERS & BELL — no public API, show as manual check ──────────────────────
-// Neither carrier has a machine-readable status API.
-// We attempt to fetch their page — if it loads they're at least partially up.
-async function fetchRogers() {
+// ── ROGERS & BELL — no-cors ping (Canada only by nature) ─────────────────────
+async function pingVendor(url) {
   try {
-    const controller = new AbortController();
-    setTimeout(() => controller.abort(), 5000);
-    const r = await fetch('https://www.rogers.com/support/outage', {
-      method: 'HEAD', mode: 'no-cors', signal: controller.signal
-    });
-    // no-cors always returns opaque — if we get here the domain resolved = up
+    const ctrl = new AbortController();
+    setTimeout(() => ctrl.abort(), 6000);
+    await fetch(url, { method:'HEAD', mode:'no-cors', signal: ctrl.signal });
     return { status:'ok', label:'Operational' };
   } catch(e) {
     return { status:'unknown', label:'Check Vendor' };
   }
 }
-
-async function fetchBell() {
-  try {
-    const controller = new AbortController();
-    setTimeout(() => controller.abort(), 5000);
-    await fetch('https://supportinternet.bell.ca/network-status.php', {
-      method: 'HEAD', mode: 'no-cors', signal: controller.signal
-    });
-    return { status:'ok', label:'Operational' };
-  } catch(e) {
-    return { status:'unknown', label:'Check Vendor' };
-  }
-}
+const fetchRogers = () => pingVendor('https://www.rogers.com/support/outage');
+const fetchBell   = () => pingVendor('https://supportinternet.bell.ca/network-status.php');
 
 // ── MASTER FETCH — all in parallel ───────────────────────────────────────────
 async function fetchAllStatuses() {
-  const results = await Promise.allSettled([
-    fetchBlackboard(),
-    fetchDuo(),
-    fetchCloudflare(),
-    fetchPaloAlto(),
-    fetchMicrosoft(),
-    fetchMicrosoft(), // Teams shares same feed as M365
-    fetchAzure(),
-    fetchAWS(),
-    fetchGitHub(),
-    fetchAnthropic(),
-    fetchGemini(),
-    fetchRogers(),
-    fetchBell(),
-    fetchZoom(),
-  ]);
+  const fetchers = [
+    fetchBlackboard,
+    fetchDuo,
+    fetchCloudflare,
+    fetchPaloAlto,
+    fetchMicrosoft,
+    fetchMicrosoft, // Teams shares same M365 feed
+    fetchAzure,
+    fetchAWS,
+    fetchGitHub,
+    fetchAnthropic,
+    fetchGemini,
+    fetchRogers,
+    fetchBell,
+    fetchZoom,
+  ];
+  const keys = [
+    'blackboard','duo','cloudflare','paloalto',
+    'm365','msteams','azure','aws',
+    'github','claude','gemini',
+    'rogers','bell','zoom'
+  ];
 
-  const keys = ['blackboard','duo','cloudflare','paloalto','m365','msteams',
-                 'azure','aws','github','claude','gemini','rogers','bell','zoom'];
-
+  const results = await Promise.allSettled(fetchers.map(fn => fn()));
   keys.forEach((key, i) => {
     const r = results[i];
-    statuses[key] = (r.status === 'fulfilled' && r.value)
-      ? r.value
-      : { status:'unknown', label:'Unavailable' };
+    if (r.status === 'fulfilled' && r.value) {
+      statuses[key] = r.value;
+    } else {
+      statuses[key] = { status:'unknown', label:'Unavailable' };
+    }
   });
 }
 
