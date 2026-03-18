@@ -497,33 +497,8 @@ async function fetchGitHub() {
   }
 }
 
-// ── ANTHROPIC / CLAUDE — correct URL is status.claude.com ────────────────────
-async function fetchAnthropic() {
-  // Try direct first, then proxy fallback
-  const urls = [
-    'https://status.claude.com/api/v2/summary.json',
-    'https://status.anthropic.com/api/v2/summary.json',
-  ];
-  for (const url of urls) {
-    try {
-      const ctrl = new AbortController();
-      setTimeout(() => ctrl.abort(), 6000);
-      const r = await fetch(url, { signal: ctrl.signal });
-      if (!r.ok) continue;
-      const d = await r.json();
-      const active = (d.incidents||[]).filter(i => i.status !== 'resolved');
-      if (!active.length) return indicatorToStatus(d.status?.indicator);
-      return impactToStatus(active[0].impact);
-    } catch(e) { continue; }
-  }
-  // Try via proxy
-  const data = await fetchWithProxy('https://status.claude.com/api/v2/summary.json');
-  if (!data) return { status:'unknown', label:'Unavailable' };
-  const active = (data.incidents||[]).filter(i => i.status !== 'resolved');
-  if (!active.length) return indicatorToStatus(data.status?.indicator);
-  return impactToStatus(active[0].impact);
-}
-}
+// ── ANTHROPIC / CLAUDE — force through proxy (CORS blocked from GitHub Pages) ─
+const fetchAnthropic = () => fetchStatusPage('https://status.anthropic.com');
 
 // ── OTHERS — via proxy chain ──────────────────────────────────────────────────
 const fetchBlackboard = () => fetchStatusPage('https://status.blackboard.com');
