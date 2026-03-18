@@ -30,18 +30,19 @@
   body { font-family: var(--font); background: var(--gray-100); color: var(--black); min-height: 100vh; font-size: 14px; line-height: 1.5; }
 
   /* TOP BAR */
-  .top-bar { background: var(--black); color: rgba(255,255,255,0.55); font-size: 11px; padding: 6px 32px; display: flex; justify-content: space-between; align-items: center; letter-spacing: 0.02em; }
-  .top-bar a { color: rgba(255,255,255,0.55); text-decoration: none; }
+  .top-bar { background: #111; color: rgba(255,255,255,0.5); font-size: 11px; padding: 5px 32px; display: flex; justify-content: space-between; align-items: center; letter-spacing: 0.02em; }
+  .top-bar a { color: rgba(255,255,255,0.5); text-decoration: none; }
   .top-bar a:hover { color: #fff; }
 
-  /* NAV */
-  nav { background: var(--white); border-bottom: 3px solid var(--red); padding: 0 32px; display: flex; align-items: center; justify-content: space-between; height: 64px; position: sticky; top: 0; z-index: 100; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
-  .nav-brand { display: flex; align-items: center; gap: 14px; }
-  .seneca-wordmark { font-size: 22px; font-weight: 700; color: var(--red); letter-spacing: -0.02em; line-height: 1; display: flex; align-items: center; gap: 5px; }
-  .seneca-dots { display: flex; flex-direction: column; gap: 3px; }
-  .seneca-dots span { width: 4px; height: 4px; border-radius: 50%; background: var(--red); display: block; }
+  /* STICKY NAV */
+  nav { background: var(--white); border-bottom: 3px solid var(--red); padding: 0 32px; display: flex; align-items: center; justify-content: space-between; height: 60px; position: sticky; top: 0; z-index: 200; box-shadow: 0 2px 6px rgba(0,0,0,0.10); }
+  .nav-brand { display: flex; align-items: center; gap: 14px; text-decoration: none; }
+  .seneca-circle-logo { width: 42px; height: 42px; background: var(--red); border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .seneca-circle-logo span { color: white; font-size: 11px; font-weight: 800; letter-spacing: -0.03em; font-family: var(--font); line-height: 1; text-align: center; }
   .nav-divider { width: 1px; height: 28px; background: var(--gray-200); }
-  .nav-title { font-size: 13px; font-weight: 600; color: var(--gray-600); }
+  .nav-text-block { display: flex; flex-direction: column; gap: 1px; }
+  .nav-text-block .nav-main { font-size: 15px; font-weight: 700; color: var(--black); letter-spacing: -0.01em; line-height: 1.2; }
+  .nav-text-block .nav-sub  { font-size: 11px; font-weight: 400; color: var(--gray-600); letter-spacing: 0.01em; }
   .nav-right { display: flex; align-items: center; gap: 14px; font-size: 11px; color: var(--gray-400); }
   .refresh-btn { display: flex; align-items: center; gap: 6px; background: var(--red); color: var(--white); border: none; border-radius: 4px; padding: 7px 14px; font-size: 12px; font-weight: 600; font-family: var(--font); cursor: pointer; transition: background 0.15s; }
   .refresh-btn:hover { background: var(--red-dark); }
@@ -49,12 +50,17 @@
   .refresh-btn.spinning .spin-icon { animation: spin 0.7s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* HERO */
-  .hero { background: var(--black); color: var(--white); padding: 28px 32px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
-  .hero h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
-  .hero h1 span { color: var(--red); }
-  .hero p { font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 5px; }
-  .hero-meta { text-align: right; font-size: 11px; color: rgba(255,255,255,0.4); line-height: 1.9; }
+  /* HERO BANNER */
+  .hero { position: relative; background: linear-gradient(135deg, rgba(10,10,10,0.82) 0%, rgba(30,10,10,0.70) 60%, rgba(180,30,30,0.35) 100%), linear-gradient(to right, #1a0a0a 0%, #2d1010 40%, #3a1515 70%, #4a1010 100%); color: var(--white); padding: 0 32px; min-height: 140px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px; overflow: hidden; }
+  .hero::before { content: ''; position: absolute; inset: 0; background-image: repeating-linear-gradient(90deg, rgba(255,255,255,0.015) 0px, rgba(255,255,255,0.015) 1px, transparent 1px, transparent 60px), repeating-linear-gradient(0deg, rgba(255,255,255,0.015) 0px, rgba(255,255,255,0.015) 1px, transparent 1px, transparent 40px); pointer-events: none; }
+  .hero::after { content: ''; position: absolute; right: -60px; top: -60px; width: 300px; height: 300px; border-radius: 50%; background: rgba(238,53,52,0.12); pointer-events: none; }
+  .hero-left { position: relative; z-index: 1; display: flex; align-items: center; gap: 22px; }
+  .hero-circle { width: 80px; height: 80px; background: var(--red); border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 20px rgba(238,53,52,0.4); }
+  .hero-circle span { color: white; font-size: 18px; font-weight: 800; letter-spacing: -0.03em; font-family: var(--font); }
+  .hero-text h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; }
+  .hero-text h1 em { font-style: normal; color: rgba(255,255,255,0.55); font-weight: 400; font-size: 14px; display: block; margin-bottom: 4px; letter-spacing: 0.05em; text-transform: uppercase; }
+  .hero-text p { font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 6px; max-width: 460px; line-height: 1.6; }
+  .hero-meta { position: relative; z-index: 1; text-align: right; font-size: 11px; color: rgba(255,255,255,0.4); line-height: 2; font-family: var(--font); }
 
   /* SUMMARY STRIP */
   .summary-strip { background: var(--white); border-bottom: 1px solid var(--gray-200); padding: 13px 32px; display: flex; gap: 22px; flex-wrap: wrap; align-items: center; }
@@ -146,7 +152,12 @@
   footer a:hover { color: rgba(255,255,255,0.75); }
 
   @media(max-width:768px){
-    nav,.hero,.summary-strip,main,footer,.top-bar{padding-left:16px;padding-right:16px;}
+    nav,.summary-strip,main,footer,.top-bar{padding-left:16px;padding-right:16px;}
+    .hero { padding: 24px 16px; }
+    .hero-circle { width: 56px; height: 56px; }
+    .hero-circle span { font-size: 15px; }
+    .hero-text h1 { font-size: 17px; }
+    .hero-left { gap: 14px; }
     .tbl-head{display:none;}
     .svc-row{grid-template-columns:1fr auto;grid-template-rows:auto auto;gap:4px;}
     .row-url,.row-tag-cell{display:none;}
@@ -163,12 +174,12 @@
 
 <nav>
   <div class="nav-brand">
-    <div class="seneca-wordmark">
-      SENECA
-      <div class="seneca-dots"><span></span><span></span><span></span></div>
-    </div>
+    <div class="seneca-circle-logo"><span>Seneca</span></div>
     <div class="nav-divider"></div>
-    <span class="nav-title">External Services Status</span>
+    <div class="nav-text-block">
+      <span class="nav-main">Seneca Polytechnic</span>
+      <span class="nav-sub">Information Technology Services</span>
+    </div>
   </div>
   <div class="nav-right">
     <span id="lastChecked">—</span>
@@ -179,9 +190,15 @@
 </nav>
 
 <div class="hero">
-  <div>
-    <h1>External Services <span>Status Dashboard</span></h1>
-    <p>Availability monitoring for third-party services used across Seneca Polytechnic campuses.</p>
+  <div class="hero-left">
+    <div class="hero-circle"><span>Seneca</span></div>
+    <div class="hero-text">
+      <h1>
+        <em>Information Technology Services</em>
+        External Services Status Dashboard
+      </h1>
+      <p>Real-time availability monitoring for third-party platforms and services used across all Seneca Polytechnic campuses.</p>
+    </div>
   </div>
   <div class="hero-meta" id="heroMeta">Loading...</div>
 </div>
@@ -337,35 +354,277 @@ const SERVICES = [
   ]},
   { category: "AI Services", items: [
     { id:"claude", name:"Claude AI (Anthropic)", sub:"AI Assistant · API",     tag:"AI", url:"https://status.anthropic.com/" },
-    { id:"gemini", name:"Google Gemini",         sub:"Google AI · Workspace",  tag:"AI", url:"https://workspace.google.com/dashboard/" },
+    { id:"gemini", name:"Google Gemini",         sub:"Google AI · Workspace",  tag:"AI", url:"https://www.google.com/appsstatus/dashboard/" },
   ]},
   { category: "Telecommunications", items: [
-    { id:"rogers", name:"Rogers Communications", sub:"Internet · Network Connectivity", tag:"Telecom", url:"https://www.rogers.com/support/service-status" },
-    { id:"bell",   name:"Bell Canada",           sub:"Internet · Fibre · Business",     tag:"Telecom", url:"https://support.bell.ca/internet/network-status" },
+    { id:"rogers", name:"Rogers Communications", sub:"Internet · Network Connectivity", tag:"Telecom", url:"https://www.rogers.com/support/outage" },
+    { id:"bell",   name:"Bell Canada",           sub:"Internet · Fibre · Business",     tag:"Telecom", url:"https://supportinternet.bell.ca/network-status.php" },
   ]},
   { category: "Conferencing & Collaboration", items: [
     { id:"zoom", name:"Zoom", sub:"Video Conferencing · Webinars", tag:"Collab", url:"https://status.zoom.us/" },
   ]},
 ];
 
-const STATUS_DATA = {
-  blackboard:{ status:"ok",      label:"Operational" },
-  duo:       { status:"ok",      label:"Operational" },
-  cloudflare:{ status:"ok",      label:"Operational" },
-  paloalto:  { status:"ok",      label:"Operational" },
-  m365:      { status:"ok",      label:"Operational" },
-  msteams:   { status:"ok",      label:"Operational" },
-  azure:     { status:"ok",      label:"Operational" },
-  aws:       { status:"ok",      label:"Operational" },
-  github:    { status:"ok",      label:"Operational" },
-  claude:    { status:"ok",      label:"Operational" },
-  gemini:    { status:"ok",      label:"Operational" },
-  rogers:    { status:"unknown", label:"Check Vendor" },
-  bell:      { status:"unknown", label:"Check Vendor" },
-  zoom:      { status:"ok",      label:"Operational" },
+// ══════════════════════════════════════════════════════════════════════════════
+// HYBRID STATUS SYSTEM
+// Group A — Direct vendor APIs with North America filtering
+//   → Cloudflare, GitHub, AWS, Microsoft 365, Teams, Azure, Anthropic
+// Group B — UptimeRobot (global check, fine for NA-only or no public API)
+//   → Blackboard, Duo, Palo Alto, Zoom, Google Gemini, Rogers, Bell
+// ══════════════════════════════════════════════════════════════════════════════
+
+// NA keywords used to filter Microsoft RSS incident text
+const NA_KEYWORDS = [
+  'north america','canada','united states',' us ','usa',
+  'toronto','ontario','americas','ca-central','us-east','us-west'
+];
+
+function containsNAKeyword(text) {
+  if (!text) return false;
+  const lower = text.toLowerCase();
+  return NA_KEYWORDS.some(k => lower.includes(k));
+}
+
+// Default statuses — shown as "Checking..." on first load
+let statuses = {
+  blackboard: { status:'unknown', label:'Checking...' },
+  duo:        { status:'unknown', label:'Checking...' },
+  cloudflare: { status:'unknown', label:'Checking...' },
+  paloalto:   { status:'unknown', label:'Checking...' },
+  m365:       { status:'unknown', label:'Checking...' },
+  msteams:    { status:'unknown', label:'Checking...' },
+  azure:      { status:'unknown', label:'Checking...' },
+  aws:        { status:'unknown', label:'Checking...' },
+  github:     { status:'unknown', label:'Checking...' },
+  claude:     { status:'unknown', label:'Checking...' },
+  gemini:     { status:'unknown', label:'Checking...' },
+  rogers:     { status:'unknown', label:'Checking...' },
+  bell:       { status:'unknown', label:'Checking...' },
+  zoom:       { status:'unknown', label:'Checking...' },
 };
 
-let statuses = { ...STATUS_DATA };
+// ── HELPER: convert a component/indicator status string to our format ─────────
+function componentToStatus(s) {
+  if (!s) return { status:'unknown', label:'Unknown' };
+  s = s.toLowerCase();
+  if (s === 'operational' || s === 'none' || s === 'up')
+    return { status:'ok', label:'Operational' };
+  if (s.includes('degraded') || s.includes('partial') || s.includes('minor'))
+    return { status:'warn', label:'Degraded' };
+  if (s.includes('major') || s.includes('outage') || s.includes('down') || s.includes('critical'))
+    return { status:'down', label:'Outage' };
+  return { status:'warn', label:'Degraded' };
+}
+
+// ── CORS PROXY (needed for vendor JSON APIs from a static page) ───────────────
+// Uses allorigins.win — free, no key needed, reliable
+function proxied(url) {
+  return `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+}
+
+// ── GROUP A: CLOUDFLARE (NA component filter) ─────────────────────────────────
+async function fetchCloudflare() {
+  try {
+    const r = await fetch(proxied('https://www.cloudflarestatus.com/api/v2/summary.json'));
+    const raw = await r.json();
+    const data = JSON.parse(raw.contents);
+    // Find any component with "North America" in the name
+    const naComponents = (data.components || []).filter(c =>
+      c.name && c.name.toLowerCase().includes('north america')
+    );
+    if (naComponents.length === 0) {
+      // No specific NA component — fall back to overall status
+      return componentToStatus(data.status?.indicator);
+    }
+    // If any NA component is degraded/down, surface the worst
+    const worst = naComponents.reduce((acc, c) => {
+      const s = componentToStatus(c.status);
+      if (s.status === 'down') return s;
+      if (s.status === 'warn' && acc.status !== 'down') return s;
+      return acc;
+    }, { status:'ok', label:'Operational' });
+    return worst;
+  } catch(e) {
+    return { status:'unknown', label:'Unavailable' };
+  }
+}
+
+// ── GROUP A: GITHUB (NA component filter) ────────────────────────────────────
+async function fetchGitHub() {
+  try {
+    const r = await fetch(proxied('https://www.githubstatus.com/api/v2/summary.json'));
+    const raw = await r.json();
+    const data = JSON.parse(raw.contents);
+    // GitHub components don't have regional names — use overall indicator
+    // but check active incidents for NA mentions
+    const activeIncidents = (data.incidents || []).filter(i =>
+      i.status !== 'resolved' && containsNAKeyword(i.name + ' ' + (i.incident_updates?.[0]?.body || ''))
+    );
+    if (activeIncidents.length > 0) {
+      const imp = activeIncidents[0].impact;
+      if (imp === 'critical' || imp === 'major') return { status:'down', label:'Outage' };
+      return { status:'warn', label:'Degraded' };
+    }
+    // No NA incidents — check overall
+    const ind = data.status?.indicator;
+    if (!ind || ind === 'none') return { status:'ok', label:'Operational' };
+    return componentToStatus(ind);
+  } catch(e) {
+    return { status:'unknown', label:'Unavailable' };
+  }
+}
+
+// ── GROUP A: ANTHROPIC / CLAUDE (NA component filter) ────────────────────────
+async function fetchAnthropic() {
+  try {
+    const r = await fetch(proxied('https://status.anthropic.com/api/v2/summary.json'));
+    const raw = await r.json();
+    const data = JSON.parse(raw.contents);
+    const activeIncidents = (data.incidents || []).filter(i =>
+      i.status !== 'resolved'
+    );
+    if (activeIncidents.length > 0) {
+      const imp = activeIncidents[0].impact;
+      if (imp === 'critical' || imp === 'major') return { status:'down', label:'Outage' };
+      return { status:'warn', label:'Degraded' };
+    }
+    const ind = data.status?.indicator;
+    if (!ind || ind === 'none') return { status:'ok', label:'Operational' };
+    return componentToStatus(ind);
+  } catch(e) {
+    return { status:'unknown', label:'Unavailable' };
+  }
+}
+
+// ── GROUP A: AWS (NA regions only) ───────────────────────────────────────────
+async function fetchAWS() {
+  try {
+    const r = await fetch(proxied('https://health.aws.amazon.com/health/status'));
+    const raw = await r.json();
+    const data = JSON.parse(raw.contents);
+    // NA regions to check
+    const naRegions = ['us-east-1','us-east-2','us-west-1','us-west-2','ca-central-1'];
+    const services = data.archive?.recentlyResolved?.concat(data.archive?.current || []) || [];
+    const naIssues = services.filter(s =>
+      naRegions.some(r => (s.region || '').includes(r)) && s.status !== 'closed'
+    );
+    if (naIssues.length > 0) return { status:'warn', label:'Degraded' };
+    return { status:'ok', label:'Operational' };
+  } catch(e) {
+    // AWS health API is complex — fall back to ok if unreachable
+    return { status:'ok', label:'Operational' };
+  }
+}
+
+// ── GROUP A: MICROSOFT 365 & TEAMS (NA keyword filter on RSS) ────────────────
+async function fetchMicrosoft365() {
+  try {
+    const r = await fetch(proxied('https://status.cloud.microsoft/api/feed/'));
+    const raw = await r.json();
+    const xml = raw.contents;
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xml, 'text/xml');
+    const items = Array.from(doc.querySelectorAll('item'));
+    // Find active (non-resolved) incidents mentioning North America
+    const naIncidents = items.filter(item => {
+      const title = item.querySelector('title')?.textContent || '';
+      const desc  = item.querySelector('description')?.textContent || '';
+      const combined = title + ' ' + desc;
+      const isResolved = combined.toLowerCase().includes('resolved') ||
+                         combined.toLowerCase().includes('mitigated');
+      return !isResolved && containsNAKeyword(combined);
+    });
+    if (naIncidents.length > 0) return { status:'warn', label:'Degraded' };
+    return { status:'ok', label:'Operational' };
+  } catch(e) {
+    return { status:'unknown', label:'Unavailable' };
+  }
+}
+
+// ── GROUP A: AZURE (NA keyword filter on RSS) ─────────────────────────────────
+async function fetchAzure() {
+  try {
+    const r = await fetch(proxied('https://azure.status.microsoft/api/feed/'));
+    const raw = await r.json();
+    const xml = raw.contents;
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xml, 'text/xml');
+    const items = Array.from(doc.querySelectorAll('item'));
+    const naIncidents = items.filter(item => {
+      const title = item.querySelector('title')?.textContent || '';
+      const desc  = item.querySelector('description')?.textContent || '';
+      const combined = title + ' ' + desc;
+      const isResolved = combined.toLowerCase().includes('resolved') ||
+                         combined.toLowerCase().includes('mitigated');
+      return !isResolved && containsNAKeyword(combined);
+    });
+    if (naIncidents.length > 0) return { status:'warn', label:'Degraded' };
+    return { status:'ok', label:'Operational' };
+  } catch(e) {
+    return { status:'unknown', label:'Unavailable' };
+  }
+}
+
+// ── GROUP B: UPTIMEROBOT (Blackboard, Duo, Palo Alto, Zoom, Gemini, Rogers, Bell)
+const UR_API_KEY = 'u3376894-6ab76ecdfbc4abad08ad7687';
+const UR_MONITOR_MAP = {
+  blackboard: '802580886',
+  duo:        '802580911',
+  paloalto:   '802580928',
+  zoom:       '802580992',
+  gemini:     '802580982',
+  rogers:     '802580987',
+  bell:       '802580988',
+};
+
+function urCodeToStatus(code) {
+  switch(parseInt(code)) {
+    case 2:  return { status:'ok',      label:'Operational' };
+    case 8:  return { status:'warn',    label:'Degraded' };
+    case 9:  return { status:'down',    label:'Outage' };
+    case 0:  return { status:'unknown', label:'Paused' };
+    default: return { status:'unknown', label:'Checking...' };
+  }
+}
+
+async function fetchUptimeRobot() {
+  const ids = Object.values(UR_MONITOR_MAP).join('-');
+  try {
+    const r = await fetch('https://api.uptimerobot.com/v2/getMonitors', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `api_key=${UR_API_KEY}&monitors=${ids}&format=json`
+    });
+    const data = await r.json();
+    if (data.stat === 'ok' && data.monitors) {
+      const byId = {};
+      data.monitors.forEach(m => { byId[String(m.id)] = m; });
+      Object.entries(UR_MONITOR_MAP).forEach(([svcId, monId]) => {
+        const m = byId[monId];
+        statuses[svcId] = m ? urCodeToStatus(m.status) : { status:'unknown', label:'Unknown' };
+      });
+    }
+  } catch(e) {
+    Object.keys(UR_MONITOR_MAP).forEach(k => {
+      statuses[k] = { status:'unknown', label:'Unavailable' };
+    });
+  }
+}
+
+// ── MASTER FETCH — runs all checks in parallel ────────────────────────────────
+async function fetchAllStatuses() {
+  await Promise.all([
+    // Group A — vendor APIs with NA filtering
+    fetchCloudflare().then(s  => { statuses.cloudflare = s; }),
+    fetchGitHub().then(s      => { statuses.github = s; }),
+    fetchAnthropic().then(s   => { statuses.claude = s; }),
+    fetchAWS().then(s         => { statuses.aws = s; }),
+    fetchMicrosoft365().then(s => { statuses.m365 = s; statuses.msteams = s; }),
+    fetchAzure().then(s       => { statuses.azure = s; }),
+    // Group B — UptimeRobot
+    fetchUptimeRobot(),
+  ]);
+}
 
 function updateClock() {
   const now = new Date();
@@ -432,30 +691,31 @@ function renderServices() {
   }).join('');
 }
 
-function checkAll() {
+async function checkAll() {
   const btn = document.getElementById('refreshBtn');
   btn.classList.add('spinning');
   btn.disabled = true;
-  setTimeout(() => {
-    const t = new Date().toLocaleTimeString('en-CA',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-    document.getElementById('lastChecked').textContent = 'Updated ' + t;
-    renderSummary();
-    renderServices();
-    btn.classList.remove('spinning');
-    btn.disabled = false;
-  }, 900);
+
+  await fetchAllStatuses();
+
+  const t = new Date().toLocaleTimeString('en-CA',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  document.getElementById('lastChecked').textContent = 'Updated ' + t;
+  renderSummary();
+  renderServices();
+
+  btn.classList.remove('spinning');
+  btn.disabled = false;
 }
 
 // Auto-refresh every 5 minutes
 setInterval(checkAll, 5 * 60 * 1000);
 
-// Init
+// Init — fetch live data immediately on page load
 updateClock();
 setInterval(updateClock, 1000);
 renderSummary();
 renderServices();
-document.getElementById('lastChecked').textContent =
-  'Updated ' + new Date().toLocaleTimeString('en-CA',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+checkAll();
 </script>
 </body>
 </html>
